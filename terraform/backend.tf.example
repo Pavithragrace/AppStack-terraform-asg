@@ -1,0 +1,11 @@
+# 1) First deploy backend-bootstrap to create S3 + DynamoDB.
+# 2) Then copy values into this file and rename to: backend.tf
+terraform {
+  backend "s3" {
+    bucket         = "REPLACE_STATE_BUCKET"
+    key            = "appstack/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "REPLACE_DDB_TABLE"
+    encrypt        = true
+  }
+}

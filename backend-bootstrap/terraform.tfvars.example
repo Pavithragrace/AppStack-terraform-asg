@@ -1,0 +1,3 @@
+aws_region         = "ap-south-1"
+state_bucket_name  = "pavi-appstack-tfstate-2025-unique"
+dynamodb_table_name = "appstack-terraform-locks"

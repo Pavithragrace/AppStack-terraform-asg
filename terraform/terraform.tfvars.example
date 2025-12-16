@@ -1,0 +1,19 @@
+aws_region = "ap-south-1"
+project_name = "AppStack"
+
+# DB
+db_password = "REPLACE_STRONG_PASSWORD"
+
+# Django static bucket (must be unique)
+static_bucket_prefix = "pavi-appstack-2025-unique"
+
+# Auto-deploy from GitHub (recommended)
+# app_repo_url = "https://github.com/pavithragrace/<repo>.git"
+# app_repo_ref = "main"
+
+# Optional SSH (SSM is recommended instead)
+# key_name = "your-existing-keypair"
+# allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+
+# Optional alarms email
+# alarm_email = "Pavithra.a751@gmail.com"
