@@ -1,4 +1,4 @@
-# AppStack - Ready Terraform (EC2/ASG + ALB + RDS + S3 + WAF + CloudWatch)
+# AppStack- Terraform (EC2/ASG + ALB + RDS + S3 + WAF + CloudWatch)
 
 ## What you get
 - VPC with 2 public + 2 private subnets (2 AZs)
