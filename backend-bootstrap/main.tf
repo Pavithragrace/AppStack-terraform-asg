@@ -35,7 +35,10 @@ data "aws_iam_policy_document" "tls_only" {
       aws_s3_bucket.tfstate.arn,
       "${aws_s3_bucket.tfstate.arn}/*"
     ]
-    principals { type = "*", identifiers = ["*"] }
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"

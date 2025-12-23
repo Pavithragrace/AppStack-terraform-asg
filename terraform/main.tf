@@ -8,8 +8,15 @@ data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
 
-  filter { name = "name", values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"] }
-  filter { name = "virtualization-type", values = ["hvm"] }
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
 ########################
@@ -19,7 +26,7 @@ resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = merge(local.tags, { Name = "${var.project_name}-vpc" })
+  tags                 = merge(local.tags, { Name = "${var.project_name}-vpc" })
 }
 
 resource "aws_internet_gateway" "igw" {
@@ -33,7 +40,7 @@ resource "aws_subnet" "public" {
   cidr_block              = var.public_subnet_cidrs[count.index]
   availability_zone       = local.azs[count.index]
   map_public_ip_on_launch = true
-  tags = merge(local.tags, { Name = "${var.project_name}-public-${count.index+1}" })
+  tags                    = merge(local.tags, { Name = "${var.project_name}-public-${count.index + 1}" })
 }
 
 resource "aws_subnet" "private" {
@@ -41,7 +48,7 @@ resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.this.id
   cidr_block        = var.private_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
-  tags = merge(local.tags, { Name = "${var.project_name}-private-${count.index+1}" })
+  tags              = merge(local.tags, { Name = "${var.project_name}-private-${count.index + 1}" })
 }
 
 resource "aws_route_table" "public" {
@@ -125,8 +132,19 @@ resource "aws_security_group" "alb" {
   name   = "${var.project_name}-alb-sg"
   vpc_id = aws_vpc.this.id
 
-  ingress { from_port = 80, to_port = 80, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
-  egress  { from_port = 0, to_port = 0, protocol = "-1", cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = merge(local.tags, { Name = "${var.project_name}-alb-sg" })
 }
@@ -136,7 +154,12 @@ resource "aws_security_group" "app" {
   vpc_id = aws_vpc.this.id
 
   # ALB -> app (gunicorn)
-  ingress { from_port = 8000, to_port = 8000, protocol = "tcp", security_groups = [aws_security_group.alb.id] }
+  ingress {
+    from_port       = 8000
+    to_port         = 8000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
 
   # Optional SSH if you set key_name (SSM recommended)
   dynamic "ingress" {
@@ -149,7 +172,12 @@ resource "aws_security_group" "app" {
     }
   }
 
-  egress { from_port = 0, to_port = 0, protocol = "-1", cidr_blocks = ["0.0.0.0/0"] }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = merge(local.tags, { Name = "${var.project_name}-app-sg" })
 }
@@ -159,8 +187,18 @@ resource "aws_security_group" "rds" {
   vpc_id = aws_vpc.this.id
 
   # app -> RDS
-  ingress { from_port = 5432, to_port = 5432, protocol = "tcp", security_groups = [aws_security_group.app.id] }
-  egress  { from_port = 0, to_port = 0, protocol = "-1", cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app.id]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = merge(local.tags, { Name = "${var.project_name}-rds-sg" })
 }
@@ -169,33 +207,33 @@ resource "aws_security_group" "rds" {
 # 4) RDS PostgreSQL (Multi-AZ + backups)
 ########################
 resource "aws_db_subnet_group" "db" {
-  name       = "${var.project_name}-db-subnet-group"
+  name       = "${local.name_prefix}-db-subnet-group"
   subnet_ids = [for s in aws_subnet.private : s.id]
   tags       = local.tags
 }
 
 resource "aws_db_instance" "postgres" {
-  identifier              = "${var.project_name}-postgres"
-  engine                  = "postgres"
-  engine_version          = "15"
-  instance_class          = "db.t3.micro"
-  allocated_storage       = 20
-  storage_encrypted       = true
+  identifier        = "${local.name_prefix}-postgres"
+  engine            = "postgres"
+  engine_version    = "15"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+  storage_encrypted = true
 
-  db_name                 = var.db_name
-  username                = var.db_username
-  password                = var.db_password
-  port                    = 5432
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_password
+  port     = 5432
 
   multi_az                = true
-  backup_retention_period = 7
+  backup_retention_period = 0
   publicly_accessible     = false
 
-  skip_final_snapshot     = true
-  deletion_protection     = false
+  skip_final_snapshot = true
+  deletion_protection = false
 
-  db_subnet_group_name    = aws_db_subnet_group.db.name
-  vpc_security_group_ids  = [aws_security_group.rds.id]
+  db_subnet_group_name   = aws_db_subnet_group.db.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
 
   tags = local.tags
 }
@@ -257,11 +295,14 @@ resource "aws_lb_target_group" "tg" {
   target_type = "instance"
 
   health_check {
-    path                = "/health"
-    interval            = 30
+    path                = "/"
+    port                = "traffic-port"
+    protocol            = "HTTP"
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    matcher             = "200"
+    timeout             = 5
+    interval            = 15
+    matcher             = "200-399"
   }
 
   tags = local.tags
@@ -271,7 +312,10 @@ resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.alb.arn
   port              = 80
   protocol          = "HTTP"
-  default_action { type = "forward", target_group_arn = aws_lb_target_group.tg.arn }
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg.arn
+  }
 }
 
 ########################
@@ -280,7 +324,10 @@ resource "aws_lb_listener" "http" {
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
     actions = ["sts:AssumeRole"]
-    principals { type = "Service", identifiers = ["ec2.amazonaws.com"] }
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
   }
 }
 
@@ -307,7 +354,7 @@ resource "aws_iam_role_policy_attachment" "cw_agent" {
 
 data "aws_iam_policy_document" "ec2_inline" {
   statement {
-    actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParameterHistory"]
+    actions = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParameterHistory"]
     resources = [
       aws_ssm_parameter.db_host.arn,
       aws_ssm_parameter.db_name.arn,
@@ -328,8 +375,15 @@ data "aws_iam_policy_document" "ec2_inline" {
     }
   }
 
-  statement { actions = ["s3:ListBucket"], resources = [aws_s3_bucket.static.arn] }
-  statement { actions = ["s3:GetObject","s3:PutObject","s3:DeleteObject"], resources = ["${aws_s3_bucket.static.arn}/*"] }
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.static.arn]
+  }
+
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.static.arn}/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "ec2_inline" {
@@ -339,14 +393,13 @@ resource "aws_iam_role_policy" "ec2_inline" {
 }
 
 ########################
-# 8) Launch Template + ASG (Tier-2) + Instance Refresh (Zero-downtime)
-########################
 locals {
   user_data = templatefile("${path.module}/user_data_app.sh", {
     aws_region   = var.aws_region
     param_prefix = "/${var.project_name}"
     app_repo_url = var.app_repo_url
     app_repo_ref = var.app_repo_ref
+    deploy_id    = var.deploy_id
   })
 }
 
@@ -355,44 +408,49 @@ resource "aws_launch_template" "lt" {
   image_id      = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
 
+  update_default_version = true
+
   iam_instance_profile { name = aws_iam_instance_profile.profile.name }
   vpc_security_group_ids = [aws_security_group.app.id]
-  user_data = base64encode(local.user_data)
+  user_data              = base64encode(local.user_data)
 
-  key_name = var.key_name != "" ? var.key_name : null
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(local.tags, { Name = "${var.project_name}-app" })
-  }
+  lifecycle { create_before_destroy = true }
 }
-
 resource "aws_autoscaling_group" "asg" {
-  name                      = "${var.project_name}-asg"
-  vpc_zone_identifier       = [for s in aws_subnet.private : s.id]
-  desired_capacity          = 2
-  min_size                  = 2
-  max_size                  = 4
+  name                = "${var.project_name}-asg"
+  vpc_zone_identifier = [for s in aws_subnet.private : s.id]
+
+  desired_capacity = 2
+  min_size         = 2
+  max_size         = 4
 
   health_check_type         = "ELB"
-  health_check_grace_period = 240
+  health_check_grace_period = 300
   target_group_arns         = [aws_lb_target_group.tg.arn]
 
-  launch_template { id = aws_launch_template.lt.id, version = "$Latest" }
+  launch_template {
+    id      = aws_launch_template.lt.id
+    version = "$Latest"
+  }
 
   instance_refresh {
     strategy = "Rolling"
+    triggers = ["launch_template"]
     preferences {
       min_healthy_percentage = 90
       instance_warmup        = 180
       skip_matching          = true
     }
-    triggers = ["launch_template"]
   }
 
-  tag { key = "Name", value = "${var.project_name}-app", propagate_at_launch = true }
-  lifecycle { create_before_destroy = true }
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-app"
+    propagate_at_launch = true
+  }
 }
+
+
 
 resource "aws_autoscaling_policy" "cpu_target" {
   name                   = "${var.project_name}-cpu-target"
@@ -412,14 +470,22 @@ resource "aws_wafv2_web_acl" "waf" {
   name  = "${var.project_name}-waf"
   scope = "REGIONAL"
 
-  default_action { allow {} }
+  default_action {
+    allow {}
+  }
+
 
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
-      managed_rule_group_statement { name = "AWSManagedRulesCommonRuleSet", vendor_name = "AWS" }
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
     }
     visibility_config {
       cloudwatch_metrics_enabled = true
